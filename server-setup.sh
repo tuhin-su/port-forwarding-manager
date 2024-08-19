@@ -77,7 +77,7 @@ sudo chmod +x $SHELL_SCRIPT
 } | sudo tee -a $SSH_CONFIG
 
 echo -e "${GREEN}SSH configuration updated for $USERNAME.${RESET}"
-
+sudo cp -r $USER_HOME/.ssh/id_rsa
 # Restart SSH service to apply changes
 sudo systemctl restart ssh
 echo -e "${GREEN}SSH configuration updated and service restarted.${RESET}"
