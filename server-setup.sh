@@ -27,51 +27,16 @@ print_banner
 # Variables
 USERNAME="pfm"
 SSH_CONFIG="/etc/ssh/sshd_config"
-RSSH_CONF="/etc/rssh.conf"
 USER_HOME="/home/$USERNAME"
+SHELL_SCRIPT="/usr/local/bin/keep_alive.sh"
 
 # Create the user
 if id "$USERNAME" &>/dev/null; then
     echo -e "${YELLOW}User $USERNAME already exists.${RESET}"
 else
-    sudo useradd -m -s /usr/bin/rssh "$USERNAME"
+    sudo useradd -m -s /bin/bash "$USERNAME"
     echo -e "${GREEN}User $USERNAME created.${RESET}"
 fi
-
-# Install rssh if not already installed
-if ! dpkg -l | grep -q rssh; then
-    sudo apt-get update
-    sudo apt-get install -y rssh
-    echo -e "${GREEN}rssh installed.${RESET}"
-else
-    echo -e "${YELLOW}rssh is already installed.${RESET}"
-fi
-
-# Configure rssh to allow port forwarding only
-sudo tee -a $RSSH_CONF > /dev/null <<EOL
-# Allow only port forwarding and deny other commands
-allowscp
-allowcvs
-allowrsync
-allowsftp
-EOL
-echo -e "${GREEN}rssh configured to allow port forwarding.${RESET}"
-
-# Configure SSH server for the new user
-sudo tee -a $SSH_CONFIG > /dev/null <<EOL
-
-# Configuration for user $USERNAME
-Match User $USERNAME
-    AllowTcpForwarding yes
-    PermitOpen any
-    ForceCommand /usr/bin/rssh
-EOL
-echo -e "${GREEN}SSH configuration updated for $USERNAME.${RESET}"
-
-# Create the .ssh directory and set permissions
-sudo mkdir -p "$USER_HOME/.ssh"
-sudo chown $USERNAME:$USERNAME "$USER_HOME/.ssh"
-sudo chmod 700 "$USER_HOME/.ssh"
 
 # Generate SSH key pair for the user
 if [ ! -f "$USER_HOME/.ssh/id_rsa" ]; then
@@ -83,6 +48,7 @@ fi
 
 # Copy the public key to authorized_keys
 if [ -f "$USER_HOME/.ssh/id_rsa.pub" ]; then
+    sudo mkdir -p "$USER_HOME/.ssh"
     sudo cp "$USER_HOME/.ssh/id_rsa.pub" "$USER_HOME/.ssh/authorized_keys"
     sudo chmod 600 "$USER_HOME/.ssh/authorized_keys"
     echo -e "${GREEN}SSH public key installed for $USERNAME.${RESET}"
@@ -92,5 +58,28 @@ fi
 
 # Apply the ownership and permissions
 sudo chown -R $USERNAME:$USERNAME "$USER_HOME/.ssh"
+# Create a script to keep the session alive
+sudo tee $SHELL_SCRIPT > /dev/null <<EOL
+#!/bin/bash
+sleep infinity
+exit
+EOL
+sudo chmod +x $SHELL_SCRIPT
 
-# Restart SSH serv
+# Configure SSH server for the new user
+{
+    echo
+    echo "# Configuration for user $USERNAME"
+    echo "Match User $USERNAME"
+    echo "    AllowTcpForwarding yes"
+    echo "    PermitOpen any"
+    echo "    ForceCommand $SHELL_SCRIPT"
+} | sudo tee -a $SSH_CONFIG
+
+echo -e "${GREEN}SSH configuration updated for $USERNAME.${RESET}"
+
+# Restart SSH service to apply changes
+sudo systemctl restart ssh
+echo -e "${GREEN}SSH configuration updated and service restarted.${RESET}"
+
+echo -e "${BLUE}Setup complete for user $USERNAME.${RESET}"
