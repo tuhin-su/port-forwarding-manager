@@ -25,8 +25,7 @@ print_banner() {
 print_banner
 
 # Variables
-USERNAME="sshforward"
-PORT_FORWARDING_PORT="12345"  # Example port number to forward
+USERNAME="pfm"
 SSH_CONFIG="/etc/ssh/sshd_config"
 RSSH_CONF="/etc/rssh.conf"
 USER_HOME="/home/$USERNAME"
@@ -64,10 +63,15 @@ sudo tee -a $SSH_CONFIG > /dev/null <<EOL
 # Configuration for user $USERNAME
 Match User $USERNAME
     AllowTcpForwarding yes
-    PermitOpen 127.0.0.1:$PORT_FORWARDING_PORT
+    PermitOpen any
     ForceCommand /usr/bin/rssh
 EOL
 echo -e "${GREEN}SSH configuration updated for $USERNAME.${RESET}"
+
+# Create the .ssh directory and set permissions
+sudo mkdir -p "$USER_HOME/.ssh"
+sudo chown $USERNAME:$USERNAME "$USER_HOME/.ssh"
+sudo chmod 700 "$USER_HOME/.ssh"
 
 # Generate SSH key pair for the user
 if [ ! -f "$USER_HOME/.ssh/id_rsa" ]; then
@@ -76,11 +80,6 @@ if [ ! -f "$USER_HOME/.ssh/id_rsa" ]; then
 else
     echo -e "${YELLOW}SSH key pair already exists for $USERNAME.${RESET}"
 fi
-
-# Create the .ssh directory and set permissions
-sudo mkdir -p "$USER_HOME/.ssh"
-sudo chown $USERNAME:$USERNAME "$USER_HOME/.ssh"
-sudo chmod 700 "$USER_HOME/.ssh"
 
 # Copy the public key to authorized_keys
 if [ -f "$USER_HOME/.ssh/id_rsa.pub" ]; then
@@ -94,8 +93,4 @@ fi
 # Apply the ownership and permissions
 sudo chown -R $USERNAME:$USERNAME "$USER_HOME/.ssh"
 
-# Restart SSH service to apply changes
-sudo systemctl restart ssh
-echo -e "${GREEN}SSH configuration updated and service restarted.${RESET}"
-
-echo -e "${BLUE}Setup complete for user $USERNAME.${RESET}"
+# Restart SSH serv
